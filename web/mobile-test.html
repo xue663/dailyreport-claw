@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📱 移动端测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .feature {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f7f7f7;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .feature-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .feature-desc {
+            font-size: 14px;
+            color: #666;
+        }
+        .demo-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            margin-top: 10px;
+        }
+        .demo-button:hover {
+            background: #5568d3;
+        }
+        .device-info {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .check-list {
+            list-style: none;
+            padding: 0;
+        }
+        .check-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .check-list li:before {
+            content: "✅ ";
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 移动端优化完成</h1>
+
+        <div class="card">
+            <div class="device-info" id="device-info"></div>
+        </div>
+
+        <div class="card">
+            <h2>✨ 已实现功能</h2>
+            <ul class="check-list">
+                <li>响应式布局（≤768px自动适配）</li>
+                <li>底部导航栏（4个快捷入口）</li>
+                <li>卡片折叠/展开功能</li>
+                <li>快速筛选按钮（全部/完成/执行中/计划/失败）</li>
+                <li>下拉刷新手势</li>
+                <li>滚动到顶部按钮</li>
+                <li>触摸优化（增大点击区域）</li>
+                <li>横屏模式适配</li>
+                <li>禁止双击缩放</li>
+                <li>PWA支持（可添加到主屏幕）</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>🎯 核心优化</h2>
+
+            <div class="feature">
+                <div class="feature-title">📐 垂直布局</div>
+                <div class="feature-desc">三列布局改为单列垂直堆叠，适配手机竖屏</div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-title">🎨 触摸优化</div>
+                <div class="feature-desc">按钮最小44px×44px，符合iOS/Android触摸标准</div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-title">⚡ 性能优化</div>
+                <div class="feature-desc">硬件加速滚动、防抖处理、passive事件监听</div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-title">🎭 视觉优化</div>
+                <div class="feature-desc">卡片式设计、左侧彩色边框、状态图标清晰</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔍 测试说明</h2>
+            <div class="feature">
+                <div class="feature-title">1. 访问控制台</div>
+                <div class="feature-desc">点击下方按钮访问移动端控制台</div>
+            </div>
+            <a href="http://10.10.1.9:8080" class="demo-button">🚀 打开控制台</a>
+
+            <div class="feature">
+                <div class="feature-title">2. 测试功能</div>
+                <div class="feature-desc">
+                    • 点击底部导航切换区域<br>
+                    • 点击卡片标题折叠/展开<br>
+                    • 使用快速筛选过滤任务<br>
+                    • 下拉页面触发刷新<br>
+                    • 滚动后点击↑返回顶部
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 适配范围</h2>
+            <div class="feature">
+                <div class="feature-title">小屏手机</div>
+                <div class="feature-desc">≤480px：iPhone SE、小米等小屏设备</div>
+            </div>
+            <div class="feature">
+                <div class="feature-title">标准手机</div>
+                <div class="feature-desc">481px-768px：iPhone 14、小米14等主流设备</div>
+            </div>
+            <div class="feature">
+                <div class="feature-title">平板横屏</div>
+                <div class="feature-desc">≤768px横屏：自动调整统计卡片布局</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 显示设备信息
+        const deviceInfo = document.getElementById('device-info');
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const isMobile = width <= 768;
+        const orientation = width > height ? '横屏' : '竖屏';
+
+        deviceInfo.innerHTML = `
+            📱 屏幕尺寸: ${width} × ${height}px<br>
+            📐 设备类型: ${isMobile ? '移动设备' : '桌面设备'}<br>
+            🔄 屏幕方向: ${orientation}<br>
+            ✅ 移动端模式: ${isMobile ? '已激活' : '未激活（请使用手机访问或缩小浏览器窗口）'}
+        `;
+    </script>
+</body>
+</html>

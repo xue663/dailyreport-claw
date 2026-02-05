@@ -2,9 +2,12 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>🤖 阿呆控制台</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/mobile.css">
 </head>
 <body>
     <div class="dashboard">
@@ -35,7 +38,8 @@
             <!-- 左侧：系统状态 -->
             <aside class="sidebar">
                 <div class="card system-card">
-                    <h2>⚡ 系统状态</h2>
+                    <h2>⚡ 系统状态 <span class="card-toggle" data-card="system-card"></span></h2>
+                    <div class="card-content">
                     <div class="status-list">
                         <div class="status-item">
                             <span class="status-label">OpenClaw</span>
@@ -77,10 +81,12 @@
                             <span class="status-value" id="uptime">--</span>
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 <div class="card stats-card">
                     <h2>📊 任务统计</h2>
+                    <div class="card-content">
                     <div class="stats-grid">
                         <div class="stat-item">
                             <span class="stat-icon">✅</span>
@@ -157,6 +163,35 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=20260206"></script>
+    <!-- 移动端底部导航 -->
+    <nav class="mobile-nav" style="display: none;">
+        <button class="nav-item active" data-section="all">
+            <span class="nav-icon">🏠</span>
+            <span>首页</span>
+        </button>
+        <button class="nav-item" data-section="tasks">
+            <span class="nav-icon">📊</span>
+            <span>任务</span>
+        </button>
+        <button class="nav-item" data-section="interactions">
+            <span class="nav-icon">💬</span>
+            <span>互动</span>
+        </button>
+        <button class="nav-item" data-section="reflection">
+            <span class="nav-icon">🤔</span>
+            <span>反思</span>
+        </button>
+    </nav>
+
+    <!-- 滚动到顶部按钮 -->
+    <button class="scroll-top" id="scroll-top">↑</button>
+
+    <!-- 下拉刷新提示 -->
+    <div class="pull-to-refresh" id="pull-to-refresh">
+        <span>↓ 下拉刷新</span>
+    </div>
+
+    <script src="/static/app.js?v=20260206v2"></script>
+    <script src="/static/mobile.js?v=20260206v2"></script>
 </body>
 </html>

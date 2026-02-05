@@ -221,19 +221,22 @@ function updateTasks(tasks) {
         // 任务类型标签
         let taskTypeLabel = '';
         if (isUserTask) {
-            taskTypeLabel = ' <span style="opacity: 0.6;">(用户任务)</span>';
+            taskTypeLabel = '<span class="task-type">用户</span>';
         } else if (isSystemTask) {
-            taskTypeLabel = ' <span style="opacity: 0.6;">(系统任务)</span>';
+            taskTypeLabel = '<span class="task-type">系统</span>';
         }
 
         // 用户任务显示描述，工具任务显示描述
         const description = escapeHtml(task.description || '无描述');
 
         return `
-            <div class="task-item ${statusClass}">
-                <div class="task-time">${time}</div>
-                <div class="task-status">${statusIcon}</div>
-                <div class="task-description">${description}${taskTypeLabel}</div>
+            <div class="task-item ${statusClass}" data-status="${task.status}">
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+                    <div class="task-time">${time}</div>
+                    <div class="task-status">${statusIcon}</div>
+                </div>
+                <div class="task-description">${description}</div>
+                ${taskTypeLabel}
             </div>
         `;
     }).join('');
@@ -255,11 +258,16 @@ function updateInteractions(interactions) {
         const userMsg = escapeHtml(interaction.user_message || '');
         const botMsg = escapeHtml(interaction.bot_response || '');
 
+        // 截断过长的消息
+        const maxLen = 80;
+        const truncatedUserMsg = userMsg.length > maxLen ? userMsg.substring(0, maxLen) + '...' : userMsg;
+        const truncatedBotMsg = botMsg.length > maxLen ? botMsg.substring(0, maxLen) + '...' : botMsg;
+
         return `
             <div class="interaction-item">
-                <div class="interaction-time">${time}</div>
-                <div class="interaction-msg user">你: ${userMsg}</div>
-                ${botMsg ? `<div class="interaction-msg bot">我: ${botMsg}</div>` : ''}
+                <div style="font-size: 11px; color: var(--neon-blue); margin-bottom: 6px; font-weight: 600;">${time}</div>
+                ${truncatedUserMsg ? `<div style="font-size: 12px; color: var(--text-primary); margin-bottom: 4px;">💬 ${truncatedUserMsg}</div>` : ''}
+                ${truncatedBotMsg ? `<div style="font-size: 12px; color: var(--text-secondary);">🤖 ${truncatedBotMsg}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -276,34 +284,37 @@ function updateReflection(reflection) {
 
     let html = '';
 
-    if (reflection.improvements && reflection.improvements.length > 0) {
-        html += `
-            <div class="reflection-section">
-                <div class="reflection-title">💡 改进建议</div>
-                <ul class="reflection-list">
-                    ${reflection.improvements.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
-                </ul>
-            </div>
-        `;
-    }
-
+    // 今日收获
     if (reflection.learnings && reflection.learnings.length > 0) {
         html += `
             <div class="reflection-section">
-                <div class="reflection-title">📚 今日收获</div>
-                <ul class="reflection-list">
+                <h4>📚 今日收获</h4>
+                <ul>
                     ${reflection.learnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
                 </ul>
             </div>
         `;
     }
 
+    // 明日计划
     if (reflection.tomorrow && reflection.tomorrow.length > 0) {
         html += `
             <div class="reflection-section">
-                <div class="reflection-title">📅 明日计划</div>
-                <ul class="reflection-list">
+                <h4>📅 明日计划</h4>
+                <ul>
                     ${reflection.tomorrow.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // 改进建议
+    if (reflection.improvements && reflection.improvements.length > 0) {
+        html += `
+            <div class="reflection-section">
+                <h4>💡 改进建议</h4>
+                <ul>
+                    ${reflection.improvements.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
                 </ul>
             </div>
         `;
