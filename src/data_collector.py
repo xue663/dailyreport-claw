@@ -15,6 +15,88 @@ class DataCollector:
         self.data_dir = Path(__file__).parent.parent / 'data'
         self.data_dir.mkdir(exist_ok=True)
 
+    def create_task(self, description, user_message=''):
+        """创建新任务（执行中状态）
+
+        Args:
+            description: 任务描述（AI理解后的总结）
+            user_message: 原始用户消息
+
+        Returns:
+            task_id: 创建的任务ID
+        """
+        import time
+        task_id = f"task_{int(time.time() * 1000)}"
+
+        task = {
+            "id": task_id,
+            "description": description,
+            "user_message": user_message,
+            "status": "running",
+            "created_at": datetime.now().isoformat(),
+            "start_time": datetime.now().isoformat(),
+            "end_time": None,
+            "duration": None,
+            "result": "",
+            "task_type": "user_task"
+        }
+
+        # 保存到独立的用户任务文件
+        self._save_user_task(task)
+
+        print(f"✅ 创建任务: {description} (ID: {task_id})")
+        return task_id
+
+    def update_task(self, task_id, status, result=''):
+        """更新任务状态
+
+        Args:
+            task_id: 任务ID
+            status: 新状态 (running/completed/failed)
+            result: 结果摘要
+
+        Returns:
+            bool: 更新是否成功
+        """
+        try:
+            user_tasks_file = self.data_dir / 'user_tasks.json'
+
+            if not user_tasks_file.exists():
+                return False
+
+            with open(user_tasks_file, 'r', encoding='utf-8') as f:
+                tasks = json.load(f)
+
+            # 查找并更新任务
+            for task in tasks:
+                if task.get('id') == task_id:
+                    task['status'] = status
+                    task['result'] = result
+
+                    # 如果是完成或失败，记录结束时间和持续时间
+                    if status in ['completed', 'failed']:
+                        task['end_time'] = datetime.now().isoformat()
+                        if task.get('start_time'):
+                            try:
+                                start = datetime.fromisoformat(task['start_time'])
+                                end = datetime.fromisoformat(task['end_time'])
+                                task['duration'] = round((end - start).total_seconds(), 2)
+                            except:
+                                pass
+
+                    # 保存回文件
+                    with open(user_tasks_file, 'w', encoding='utf-8') as f:
+                        json.dump(tasks, f, indent=2, ensure_ascii=False)
+
+                    print(f"✅ 更新任务 {task_id}: {status}")
+                    return True
+
+            return False
+
+        except Exception as e:
+            print(f"❌ 更新任务失败: {e}")
+            return False
+
     def get_system_status(self):
         """收集系统状态"""
         try:
@@ -595,6 +677,32 @@ class DataCollector:
 
         except Exception as e:
             print(f"Error saving task record: {e}")
+
+    def _save_user_task(self, task):
+        """保存用户任务到独立文件"""
+        user_tasks_file = self.data_dir / 'user_tasks.json'
+
+        try:
+            # 读取现有用户任务
+            if user_tasks_file.exists():
+                with open(user_tasks_file, 'r', encoding='utf-8') as f:
+                    tasks = json.load(f)
+            else:
+                tasks = []
+
+            # 添加新任务到开头
+            tasks.insert(0, task)
+
+            # 保持最近100条记录
+            if len(tasks) > 100:
+                tasks = tasks[:100]
+
+            # 保存
+            with open(user_tasks_file, 'w', encoding='utf-8') as f:
+                json.dump(tasks, f, indent=2, ensure_ascii=False)
+
+        except Exception as e:
+            print(f"Error saving user task: {e}")
 
     def _save_tasks_to_file(self, new_tasks):
         """批量保存任务到文件，避免重复

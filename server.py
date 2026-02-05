@@ -39,6 +39,23 @@ class APIHandler(SimpleHTTPRequestHandler):
             # 静态文件
             super().do_GET()
 
+    def do_POST(self):
+        # 初始化数据收集器
+        if self.data_collector is None:
+            from data_collector import DataCollector
+            from system_monitor import SystemMonitor
+            config_path = Path(__file__).parent / 'config.json'
+            self.data_collector = DataCollector(config_path)
+            self.monitor = SystemMonitor(config_path)
+
+        # POST API路由
+        if self.path == '/api/task/create':
+            self.handle_create_task()
+        elif self.path == '/api/task/update':
+            self.handle_update_task()
+        else:
+            self.send_error_response("Unknown API endpoint")
+
     def handle_api_request(self):
         """处理API数据请求"""
         try:
@@ -81,6 +98,69 @@ class APIHandler(SimpleHTTPRequestHandler):
             "service": "dailyreport-claw",
             "timestamp": datetime.datetime.now().isoformat()
         })
+
+    def handle_create_task(self):
+        """创建新任务"""
+        try:
+            # 读取POST数据
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+
+            description = data.get('description', '')
+            user_message = data.get('user_message', '')
+
+            if not description:
+                self.send_error_response("Missing required field: description")
+                return
+
+            # 创建任务
+            task_id = self.data_collector.create_task(description, user_message)
+
+            self.send_json_response({
+                "success": True,
+                "task_id": task_id,
+                "message": "任务创建成功"
+            })
+
+        except Exception as e:
+            self.send_error_response(str(e))
+
+    def handle_update_task(self):
+        """更新任务状态"""
+        try:
+            # 读取POST数据
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+
+            task_id = data.get('task_id')
+            status = data.get('status')
+            result = data.get('result', '')
+
+            if not task_id or not status:
+                self.send_error_response("Missing required fields: task_id, status")
+                return
+
+            # 验证状态值
+            valid_statuses = ['running', 'completed', 'failed']
+            if status not in valid_statuses:
+                self.send_error_response(f"Invalid status. Must be one of: {valid_statuses}")
+                return
+
+            # 更新任务
+            success = self.data_collector.update_task(task_id, status, result)
+
+            if success:
+                self.send_json_response({
+                    "success": True,
+                    "message": "任务更新成功"
+                })
+            else:
+                self.send_error_response("Task not found")
+
+        except Exception as e:
+            self.send_error_response(str(e))
 
     def send_json_response(self, data):
         """发送JSON响应"""
