@@ -202,18 +202,29 @@ function updateTasks(tasks) {
         const statusIcon = {
             'completed': '✅',
             'failed': '❌',
-            'running': '🔄'
+            'running': '🔄',
+            'scheduled': '🕐'
         }[task.status] || '⏸️';
 
         const statusClass = {
             'completed': 'status-completed',
             'failed': 'status-failed',
-            'running': 'status-running'
+            'running': 'status-running',
+            'scheduled': 'status-scheduled'
         }[task.status] || '';
 
         // 兼容新旧字段名
         const time = formatTime(task.created_at || task.start_time || task.timestamp);
         const isUserTask = task.task_type === 'user_task';
+        const isSystemTask = task.task_type === 'system_task';
+
+        // 任务类型标签
+        let taskTypeLabel = '';
+        if (isUserTask) {
+            taskTypeLabel = ' <span style="opacity: 0.6;">(用户任务)</span>';
+        } else if (isSystemTask) {
+            taskTypeLabel = ' <span style="opacity: 0.6;">(系统任务)</span>';
+        }
 
         // 用户任务显示描述，工具任务显示描述
         const description = escapeHtml(task.description || '无描述');
@@ -222,7 +233,7 @@ function updateTasks(tasks) {
             <div class="task-item ${statusClass}">
                 <div class="task-time">${time}</div>
                 <div class="task-status">${statusIcon}</div>
-                <div class="task-description">${description}${isUserTask ? ' <span style="opacity: 0.6;">(用户任务)</span>' : ''}</div>
+                <div class="task-description">${description}${taskTypeLabel}</div>
             </div>
         `;
     }).join('');

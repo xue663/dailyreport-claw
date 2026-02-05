@@ -15,36 +15,49 @@ class DataCollector:
         self.data_dir = Path(__file__).parent.parent / 'data'
         self.data_dir.mkdir(exist_ok=True)
 
-    def create_task(self, description, user_message=''):
-        """创建新任务（执行中状态）
+    def create_task(self, description, user_message='', status='running', scheduled_time=None):
+        """创建新任务
 
         Args:
             description: 任务描述（AI理解后的总结）
             user_message: 原始用户消息
+            status: 初始状态 (running/scheduled)
+            scheduled_time: 计划执行时间（ISO格式）
 
         Returns:
             task_id: 创建的任务ID
         """
         import time
+
+        # 调试输出
+        print(f"🔍 [DEBUG] create_task收到参数: status={repr(status)}, scheduled_time={repr(scheduled_time)}")
+
         task_id = f"task_{int(time.time() * 1000)}"
 
         task = {
             "id": task_id,
             "description": description,
             "user_message": user_message,
-            "status": "running",
+            "status": status,
             "created_at": datetime.now().isoformat(),
-            "start_time": datetime.now().isoformat(),
+            "start_time": None if status == 'scheduled' else datetime.now().isoformat(),
             "end_time": None,
             "duration": None,
             "result": "",
-            "task_type": "user_task"
+            "task_type": "system_task" if status == 'scheduled' else "user_task"
         }
+
+        print(f"🔍 [DEBUG] task对象创建后: status={task['status']}, start_time={task['start_time']}")
+
+        # 如果是计划任务，添加计划时间
+        if status == 'scheduled' and scheduled_time:
+            task['scheduled_time'] = scheduled_time
 
         # 保存到独立的用户任务文件
         self._save_user_task(task)
 
-        print(f"✅ 创建任务: {description} (ID: {task_id})")
+        status_text = "🕐 计划任务" if status == 'scheduled' else "执行中"
+        print(f"✅ 创建任务: {description} (ID: {task_id}, {status_text})")
         return task_id
 
     def update_task(self, task_id, status, result=''):
@@ -107,8 +120,11 @@ class DataCollector:
             # 获取TOKENS使用量
             tokens = self._get_tokens_usage()
 
+            # 获取OpenClaw版本
+            version = self._get_openclaw_version()
+
             return {
-                "openclaw_version": "v1.0.0",
+                "openclaw_version": version,
                 "gateway_status": "running",
                 "telegram_connected": True,
                 "model": "GLM-4.7",
@@ -137,6 +153,44 @@ class DataCollector:
             "tokens_total": 0,
             "last_update": datetime.now().strftime("%H:%M:%S")
         }
+
+    def _get_openclaw_version(self):
+        """获取OpenClaw版本"""
+        try:
+            # 使用 shell=True 执行命令
+            result = subprocess.run(
+                'openclaw --version',
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                return version
+        except subprocess.TimeoutExpired:
+            print("Warning: openclaw --version timed out")
+        except Exception as e:
+            print(f"Error getting OpenClaw version: {e}")
+
+        # 如果 openclaw 命令失败，尝试从 npm 获取
+        try:
+            result = subprocess.run(
+                'npm list -g openclaw',
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if 'openclaw@' in line:
+                        version = line.split('@')[1].strip()
+                        return version
+        except Exception as e:
+            print(f"Error getting version from npm: {e}")
+
+        return "unknown"
 
     def _get_tokens_usage(self):
         """获取TOKENS使用量"""
@@ -528,26 +582,31 @@ class DataCollector:
         }
 
     def get_reflection(self):
-        """生成AI反思"""
+        """获取AI反思（从动态生成的文件读取）"""
+        reflection_file = self.data_dir / 'reflection.json'
+
+        if reflection_file.exists():
+            try:
+                with open(reflection_file, 'r', encoding='utf-8') as f:
+                    reflection = json.load(f)
+
+                # 检查反思日期，如果不是今天则返回默认
+                reflection_date = reflection.get('date', '')
+                today = datetime.now().strftime('%Y-%m-%d')
+
+                if reflection_date == today:
+                    return reflection
+                else:
+                    print(f"⚠️  反思文件日期 {reflection_date} 不是今天 {today}")
+            except Exception as e:
+                print(f"⚠️  读取反思文件失败: {e}")
+
+        # 返回默认反思
         return {
-            "improvements": [
-                "任务追踪响应速度快",
-                "需要优化失败任务重试机制",
-                "Dashboard加载流畅",
-                "会话历史集成完成"
-            ],
-            "learnings": [
-                "用户偏好科技风设计",
-                "实时Dashboard比静态报告更实用",
-                "单屏展示提升用户体验",
-                "需要从OpenClaw API获取真实数据"
-            ],
-            "tomorrow": [
-                "优化数据收集器，从会话历史自动提取任务",
-                "实现每日下午5点自动生成日报",
-                "添加更多系统监控指标（网络、磁盘）",
-                "探索可视化图表展示数据趋势"
-            ]
+            "date": datetime.now().strftime('%Y-%m-%d'),
+            "improvements": ["等待生成今日反思..."],
+            "learnings": ["反思将在每天下午5点自动生成"],
+            "tomorrow": ["请等待明日计划生成"]
         }
 
     def _create_task_from_interaction(self, user_msg, assistant_msg):

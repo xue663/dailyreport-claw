@@ -53,6 +53,8 @@ class APIHandler(SimpleHTTPRequestHandler):
             self.handle_create_task()
         elif self.path == '/api/task/update':
             self.handle_update_task()
+        elif self.path == '/api/reflection/generate':
+            self.handle_generate_reflection()
         else:
             self.send_error_response("Unknown API endpoint")
 
@@ -109,13 +111,18 @@ class APIHandler(SimpleHTTPRequestHandler):
 
             description = data.get('description', '')
             user_message = data.get('user_message', '')
+            status = data.get('status', 'running')  # 默认running，支持scheduled
+            scheduled_time = data.get('scheduled_time', None)
+
+            # 调试输出
+            print(f"🔍 [DEBUG] API收到请求: description={description}, status={status}, scheduled_time={scheduled_time}")
 
             if not description:
                 self.send_error_response("Missing required field: description")
                 return
 
             # 创建任务
-            task_id = self.data_collector.create_task(description, user_message)
+            task_id = self.data_collector.create_task(description, user_message, status, scheduled_time)
 
             self.send_json_response({
                 "success": True,
@@ -162,6 +169,39 @@ class APIHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_error_response(str(e))
 
+    def handle_generate_reflection(self):
+        """手动触发反思生成"""
+        try:
+            import subprocess
+            script_path = Path(__file__).parent / 'scripts' / 'generate_reflection.py'
+
+            if not script_path.exists():
+                self.send_error_response("Reflection script not found")
+                return
+
+            # 运行反思生成脚本
+            result = subprocess.run(
+                ['python3', str(script_path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=Path(__file__).parent
+            )
+
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": "反思生成成功",
+                    "output": result.stdout
+                })
+            else:
+                self.send_error_response(f"Reflection generation failed: {result.stderr}")
+
+        except subprocess.TimeoutExpired:
+            self.send_error_response("Reflection generation timed out")
+        except Exception as e:
+            self.send_error_response(str(e))
+
     def send_json_response(self, data):
         """发送JSON响应"""
         self.send_response(200)
@@ -183,6 +223,13 @@ class APIHandler(SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+        # 对静态文件添加缓存控制
+        if self.path.startswith('/static/'):
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+
         super().end_headers()
 
     def log_message(self, format, *args):

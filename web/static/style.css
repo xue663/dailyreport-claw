@@ -382,6 +382,11 @@ body::before {
     animation: task-running 1s infinite;
 }
 
+.task-item.status-scheduled {
+    border-left-color: var(--neon-blue);
+    opacity: 0.7;
+}
+
 @keyframes task-running {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
