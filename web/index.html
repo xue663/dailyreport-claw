@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 阿呆控制台</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- 顶部标题栏 -->
+        <header class="header">
+            <div class="header-left">
+                <h1>🤖 阿呆控制台</h1>
+                <span class="live-indicator">
+                    <span class="pulse"></span>
+                    <span id="current-time"></span>
+                </span>
+            </div>
+            <div class="header-right">
+                <button class="btn-refresh" onclick="refreshData()">
+                    <span class="icon">🔄</span> 刷新
+                </button>
+                <div class="time-filter">
+                    <button class="filter-btn active" data-filter="today">今天</button>
+                    <button class="filter-btn" data-filter="week">本周</button>
+                    <button class="filter-btn" data-filter="month">本月</button>
+                    <button class="filter-btn" data-filter="all">全部</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <div class="main-content">
+            <!-- 左侧：系统状态 -->
+            <aside class="sidebar">
+                <div class="card system-card">
+                    <h2>⚡ 系统状态</h2>
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">OpenClaw</span>
+                            <span class="status-value" id="oc-version">--</span>
+                            <span class="status-indicator" id="oc-status"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Gateway</span>
+                            <span class="status-value" id="gw-status">--</span>
+                            <span class="status-indicator" id="gw-indicator"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Telegram</span>
+                            <span class="status-value" id="tg-status">--</span>
+                            <span class="status-indicator" id="tg-indicator"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">模型</span>
+                            <span class="status-value" id="model-info">--</span>
+                            <span class="status-indicator online"></span>
+                        </div>
+                        <hr class="divider">
+                        <div class="status-item">
+                            <span class="status-label">CPU</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="cpu-bar"></div>
+                            </div>
+                            <span class="status-value" id="cpu-value">--%</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">内存</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="mem-bar"></div>
+                            </div>
+                            <span class="status-value" id="mem-value">--%</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">运行时间</span>
+                            <span class="status-value" id="uptime">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card stats-card">
+                    <h2>📊 任务统计</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-icon">✅</span>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-completed">0</div>
+                                <div class="stat-label">完成</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">❌</span>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-failed">0</div>
+                                <div class="stat-label">失败</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">🔄</span>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-running">0</div>
+                                <div class="stat-label">进行中</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">💬</span>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-interactions">0</div>
+                                <div class="stat-label">互动</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">📄</span>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-files">0</div>
+                                <div class="stat-label">产出</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">⏱️</span>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-avg-time">0s</div>
+                                <div class="stat-label">均响应</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 中间：任务流 -->
+            <main class="main-panel">
+                <div class="card tasks-card">
+                    <h2>🎯 任务执行流</h2>
+                    <div class="tasks-timeline" id="tasks-list">
+                        <!-- 任务列表动态生成 -->
+                    </div>
+                </div>
+            </main>
+
+            <!-- 右侧：互动和反思 -->
+            <aside class="right-panel">
+                <div class="card interactions-card">
+                    <h2>💬 今日互动</h2>
+                    <div class="interactions-list" id="interactions-list">
+                        <!-- 互动列表动态生成 -->
+                    </div>
+                </div>
+
+                <div class="card reflection-card">
+                    <h2>🤔 反思 & 产出</h2>
+                    <div class="reflection-content" id="reflection-content">
+                        <!-- 反思内容动态生成 -->
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

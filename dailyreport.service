@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily Report Web Dashboard - 阿呆控制台
+After=network.target
+
+[Service]
+Type=simple
+User=jun663
+WorkingDirectory=/home/jun663/.openclaw/workspace/dailyreport-claw
+ExecStart=/usr/bin/python3 /home/jun663/.openclaw/workspace/dailyreport-claw/server.py
+Restart=always
+RestartSec=10
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target
