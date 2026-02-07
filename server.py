@@ -33,6 +33,8 @@ class APIHandler(SimpleHTTPRequestHandler):
             self.handle_api_request()
         elif self.path == '/api/system':
             self.handle_system_request()
+        elif self.path == '/api/health':
+            self.handle_api_health_request()
         elif self.path == '/health':
             self.handle_health_request()
         else:
@@ -100,6 +102,19 @@ class APIHandler(SimpleHTTPRequestHandler):
             "service": "dailyreport-claw",
             "timestamp": datetime.datetime.now().isoformat()
         })
+
+    def handle_api_health_request(self):
+        """API健康检查 - 返回JSON格式状态"""
+        try:
+            health_data = {
+                "status": "ok",
+                "service": "dailyreport-claw",
+                "version": "1.0.0",
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+            self.send_json_response(health_data)
+        except Exception as e:
+            self.send_error_response(str(e))
 
     def handle_create_task(self):
         """创建新任务"""

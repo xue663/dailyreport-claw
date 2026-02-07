@@ -235,8 +235,10 @@ function updateTasks(tasks) {
                     <div class="task-time">${time}</div>
                     <div class="task-status">${statusIcon}</div>
                 </div>
-                <div class="task-description">${description}</div>
-                ${taskTypeLabel}
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                    <div class="task-description">${description}</div>
+                    ${taskTypeLabel}
+                </div>
             </div>
         `;
     }).join('');
@@ -244,7 +246,7 @@ function updateTasks(tasks) {
     console.log('✅ 任务渲染完成');
 }
 
-// 更新互动列表
+// 更新互动列表（关键词云）
 function updateInteractions(interactions) {
     const container = document.getElementById('interactions-list');
 
@@ -255,19 +257,19 @@ function updateInteractions(interactions) {
 
     container.innerHTML = interactions.slice(0, 10).map(interaction => {
         const time = formatTime(interaction.timestamp);
-        const userMsg = escapeHtml(interaction.user_message || '');
-        const botMsg = escapeHtml(interaction.bot_response || '');
+        const keywords = interaction.keywords || [];
 
-        // 截断过长的消息
-        const maxLen = 80;
-        const truncatedUserMsg = userMsg.length > maxLen ? userMsg.substring(0, maxLen) + '...' : userMsg;
-        const truncatedBotMsg = botMsg.length > maxLen ? botMsg.substring(0, maxLen) + '...' : botMsg;
+        // 生成关键词标签
+        const keywordTags = keywords.map(kw => {
+            return `<span class="keyword-tag">${escapeHtml(kw)}</span>`;
+        }).join('');
 
         return `
             <div class="interaction-item">
-                <div style="font-size: 11px; color: var(--neon-blue); margin-bottom: 6px; font-weight: 600;">${time}</div>
-                ${truncatedUserMsg ? `<div style="font-size: 12px; color: var(--text-primary); margin-bottom: 4px;">💬 ${truncatedUserMsg}</div>` : ''}
-                ${truncatedBotMsg ? `<div style="font-size: 12px; color: var(--text-secondary);">🤖 ${truncatedBotMsg}</div>` : ''}
+                <div style="font-size: 10px; color: var(--neon-blue); margin-bottom: 4px; font-weight: 600;">${time}</div>
+                <div class="keyword-cloud">
+                    ${keywordTags}
+                </div>
             </div>
         `;
     }).join('');

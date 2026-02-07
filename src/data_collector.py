@@ -5,8 +5,13 @@
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# 添加scripts目录到路径，用于导入keyword_extractor
+scripts_dir = Path(__file__).parent.parent / 'scripts'
+sys.path.insert(0, str(scripts_dir))
 
 class DataCollector:
     def __init__(self, config_path):
@@ -14,6 +19,10 @@ class DataCollector:
             self.config = json.load(f)
         self.data_dir = Path(__file__).parent.parent / 'data'
         self.data_dir.mkdir(exist_ok=True)
+
+        # 导入关键词提取器
+        from keyword_extractor import KeywordExtractor
+        self.keyword_extractor = KeywordExtractor
 
     def create_task(self, description, user_message='', status='running', scheduled_time=None):
         """创建新任务
@@ -61,7 +70,7 @@ class DataCollector:
         return task_id
 
     def update_task(self, task_id, status, result=''):
-        """更新任务状态
+        """更新任务状态（带文件锁）
 
         Args:
             task_id: 任务ID
@@ -72,13 +81,19 @@ class DataCollector:
             bool: 更新是否成功
         """
         try:
+            import fcntl
             user_tasks_file = self.data_dir / 'user_tasks.json'
 
             if not user_tasks_file.exists():
                 return False
 
+            # 读取（带共享锁）
             with open(user_tasks_file, 'r', encoding='utf-8') as f:
-                tasks = json.load(f)
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                try:
+                    tasks = json.load(f)
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
             # 查找并更新任务
             for task in tasks:
@@ -97,9 +112,13 @@ class DataCollector:
                             except:
                                 pass
 
-                    # 保存回文件
+                    # 保存回文件（带排他锁）
                     with open(user_tasks_file, 'w', encoding='utf-8') as f:
-                        json.dump(tasks, f, indent=2, ensure_ascii=False)
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                        try:
+                            json.dump(tasks, f, indent=2, ensure_ascii=False)
+                        finally:
+                            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
                     print(f"✅ 更新任务 {task_id}: {status}")
                     return True
@@ -236,36 +255,40 @@ class DataCollector:
         except:
             return "unknown"
 
-    def get_tasks(self, time_filter='today', save_to_file=True, include_user_tasks=True):
-        """从会话历史获取任务列表
+    def get_tasks(self, time_filter='today', save_to_file=True, include_user_tasks=True, include_tool_calls=False):
+        """从会话历史获取任务列表（带去重和时间统一）
 
         Args:
             time_filter: 时间筛选器 (today/week/month/all)
             save_to_file: 是否保存新任务到文件 (默认True)
             include_user_tasks: 是否包含用户任务 (默认True)
+            include_tool_calls: 是否包含工具调用 (默认False) ← 新增参数
         """
         try:
-            # 如果启用了用户任务，优先返回用户任务
-            if include_user_tasks:
-                user_tasks = self._get_user_tasks(time_filter)
-                if user_tasks:
-                    print(f"✅ 返回 {len(user_tasks)} 个用户任务")
-                    return user_tasks
-                else:
-                    print(f"⚠️  没有找到用户任务")
+            # 先检查并清理僵尸任务
+            self.check_stale_tasks()
 
-            # 如果没有用户任务或不需要用户任务，返回工具任务
-            # 但不要保存工具任务（避免覆盖用户任务）
-            save_to_file = False
-
+            # 读取用户任务
+            user_tasks = self._get_user_tasks(time_filter) if include_user_tasks else []
+            
+            # 记录已见任务ID（用于去重）
+            seen_task_ids = {task.get('id') for task in user_tasks}
+            
             # 会话目录
             sessions_dir = Path.home() / '.openclaw' / 'agents' / 'main' / 'sessions'
 
             if not sessions_dir.exists():
-                return self._load_cached_tasks(time_filter)
+                return self._filter_and_sort_tasks(user_tasks, time_filter)
 
-            tasks = []
-            # 读取所有.jsonl文件
+            tasks = user_tasks[:]  # 复制一份
+
+            # 只有在明确要求时才提取工具调用
+            if not include_tool_calls:
+                # 直接返回用户任务，不提取工具调用
+                print(f"✅ 仅返回用户任务 {len(tasks)} 个（不包含工具调用）")
+                return self._filter_and_sort_tasks(tasks, time_filter)
+
+            # 读取所有.jsonl文件（提取工具调用）
             for jsonl_file in sessions_dir.glob('*.jsonl'):
                 if jsonl_file.name.endswith('.lock'):
                     continue
@@ -285,6 +308,11 @@ class DataCollector:
 
                                 message = msg_data.get('message', {})
                                 role = message.get('role')
+                                task_id = msg_data.get('id', '')
+
+                                # 去重：跳过已存在的任务ID
+                                if task_id in seen_task_ids:
+                                    continue
 
                                 # 从assistant消息中提取工具调用
                                 if role == 'assistant':
@@ -293,9 +321,10 @@ class DataCollector:
 
                                     for tool_call in tool_calls:
                                         task = {
-                                            "id": msg_data.get('id', f"task_{len(tasks)}"),
+                                            "id": task_id or f"session_{len(tasks)}",
                                             "description": tool_call.get('description', '执行任务'),
                                             "status": "completed",
+                                            "created_at": timestamp,  # 统一使用created_at
                                             "start_time": timestamp,
                                             "end_time": timestamp,
                                             "function": tool_call.get('name', 'unknown'),
@@ -303,6 +332,7 @@ class DataCollector:
                                             "task_type": "tool_call"
                                         }
                                         tasks.append(task)
+                                        seen_task_ids.add(task['id'])
 
                                 # 从toolResult消息中提取状态
                                 elif role == 'toolResult':
@@ -314,9 +344,10 @@ class DataCollector:
                                     duration = details.get('durationMs', 0) / 1000 if details.get('durationMs') else 0
 
                                     task = {
-                                        "id": msg_data.get('id', f"task_{len(tasks)}"),
+                                        "id": task_id or f"session_{len(tasks)}",
                                         "description": f"{tool_name} - {details.get('name', tool_name)}",
                                         "status": "completed" if details.get('status') == 'completed' else "failed",
+                                        "created_at": timestamp,  # 统一使用created_at
                                         "start_time": timestamp,
                                         "end_time": timestamp,
                                         "function": tool_name,
@@ -324,6 +355,7 @@ class DataCollector:
                                         "task_type": "tool_call"
                                     }
                                     tasks.append(task)
+                                    seen_task_ids.add(task['id'])
 
                             except json.JSONDecodeError:
                                 continue
@@ -336,15 +368,12 @@ class DataCollector:
             # if save_to_file and tasks:
             #     self._save_tasks_to_file(tasks)
 
-            # 时间筛选
-            filtered_tasks = self._filter_by_time(tasks, time_filter)
-            # 按时间倒序排列（最近的在前）
-            filtered_tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
-            return filtered_tasks[-50:]
+            # 使用统一的过滤、排序和限制方法
+            return self._filter_and_sort_tasks(tasks, time_filter)
 
         except Exception as e:
             print(f"Error fetching tasks from history: {e}")
-            return self._load_cached_tasks(time_filter)
+            return self._filter_and_sort_tasks(user_tasks, time_filter)  # 降级返回用户任务
 
     def _extract_tool_calls_from_content(self, content):
         """从消息内容中提取工具调用"""
@@ -450,12 +479,18 @@ class DataCollector:
                             assistant_content = msg.get('content', [])
                             bot_text = self._extract_text_from_content(assistant_content)
 
-                            # 创建互动记录
+                            # 创建互动记录（使用关键词云）
                             if user_text:
+                                # 提取关键词，不存储原始消息
+                                keywords = self.keyword_extractor.extract_from_interaction(
+                                    user_text,
+                                    bot_text,
+                                    max_keywords=3
+                                )
+
                                 interaction = {
                                     "timestamp": current_user_msg.get('timestamp', datetime.now().isoformat()),
-                                    "user_message": user_text[:200],
-                                    "bot_response": bot_text[:200] if bot_text else '',
+                                    "keywords": keywords,  # 只存储关键词
                                     "session_type": "telegram"
                                 }
                                 interactions.append(interaction)
@@ -502,6 +537,15 @@ class DataCollector:
             filtered.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             return filtered[-20:]
         return []
+
+    def _filter_and_sort_tasks(self, tasks, time_filter):
+        """过滤、排序和限制任务数量"""
+        # 时间筛选
+        filtered_tasks = self._filter_by_time(tasks, time_filter)
+        # 按created_at时间倒序排列（最近的在前）
+        filtered_tasks.sort(key=lambda x: x.get('created_at', x.get('start_time', '')), reverse=True)
+        # 只返回最近50条
+        return filtered_tasks[:50]
 
     def _filter_by_time(self, items, time_filter):
         """根据时间筛选"""
@@ -737,15 +781,90 @@ class DataCollector:
         except Exception as e:
             print(f"Error saving task record: {e}")
 
+    def get_task_timeout(self, description):
+        """根据任务描述获取超时时间（秒）"""
+        desc_lower = description.lower()
+
+        # 开发/创建类任务：60分钟
+        if any(keyword in desc_lower for keyword in
+               ['开发', '创建', '实现', '构建', '部署', 'develop', 'create', 'implement', 'build', 'deploy']):
+            return 3600
+
+        # 修复/优化类任务：15分钟
+        if any(keyword in desc_lower for keyword in
+               ['修复', '优化', '调整', '更新', 'fix', 'optimize', 'adjust', 'update']):
+            return 900
+
+        # 分析/研究类任务：20分钟
+        if any(keyword in desc_lower for keyword in
+               ['分析', '研究', '检查', '审查', 'analyze', 'research', 'check', 'review']):
+            return 1200
+
+        # 查询/获取类任务：5分钟
+        if any(keyword in desc_lower for keyword in
+               ['查询', '获取', '读取', 'search', 'get', 'read', 'fetch']):
+            return 300
+
+        # 默认30分钟
+        return 1800
+
+    def check_stale_tasks(self):
+        """检测僵尸任务，根据任务类型使用不同的超时时间"""
+        try:
+            user_tasks_file = self.data_dir / 'user_tasks.json'
+
+            if not user_tasks_file.exists():
+                return
+
+            with open(user_tasks_file, 'r', encoding='utf-8') as f:
+                tasks = json.load(f)
+
+            now = datetime.now()
+            has_stale = False
+
+            for task in tasks:
+                if task.get('status') == 'running':
+                    start_time = task.get('start_time')
+                    if start_time:
+                        try:
+                            start = datetime.fromisoformat(start_time)
+                            # 获取该任务的超时时间
+                            timeout = self.get_task_timeout(task.get('description', ''))
+
+                            if (now - start).total_seconds() > timeout:
+                                task['status'] = 'failed'
+                                task['end_time'] = now.isoformat()
+                                timeout_minutes = timeout // 60
+                                task['result'] = f'任务超时（{timeout_minutes}分钟未响应）'
+                                task['duration'] = round((now - start).total_seconds(), 2)
+                                has_stale = True
+                                print(f"⚠️  检测到僵尸任务: {task['id']} - {task.get('description', '')[:30]}")
+                        except:
+                            pass
+
+            if has_stale:
+                with open(user_tasks_file, 'w', encoding='utf-8') as f:
+                    json.dump(tasks, f, indent=2, ensure_ascii=False)
+                print(f"✅ 已清理僵尸任务")
+
+        except Exception as e:
+            print(f"❌ 检查僵尸任务失败: {e}")
+
     def _save_user_task(self, task):
-        """保存用户任务到独立文件"""
+        """保存用户任务到独立文件（带文件锁）"""
         user_tasks_file = self.data_dir / 'user_tasks.json'
 
         try:
-            # 读取现有用户任务
+            import fcntl
+
+            # 读取现有用户任务（带锁）
             if user_tasks_file.exists():
                 with open(user_tasks_file, 'r', encoding='utf-8') as f:
-                    tasks = json.load(f)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)  # 共享锁（读）
+                    try:
+                        tasks = json.load(f)
+                    finally:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # 释放锁
             else:
                 tasks = []
 
@@ -756,9 +875,13 @@ class DataCollector:
             if len(tasks) > 100:
                 tasks = tasks[:100]
 
-            # 保存
+            # 保存（带排他锁）
             with open(user_tasks_file, 'w', encoding='utf-8') as f:
-                json.dump(tasks, f, indent=2, ensure_ascii=False)
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # 排他锁（写）
+                try:
+                    json.dump(tasks, f, indent=2, ensure_ascii=False)
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # 释放锁
 
         except Exception as e:
             print(f"Error saving user task: {e}")
